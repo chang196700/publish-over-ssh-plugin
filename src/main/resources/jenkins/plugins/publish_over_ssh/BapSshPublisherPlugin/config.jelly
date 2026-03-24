@@ -35,7 +35,7 @@
     
     <st:once>
         <script type="text/javascript" src="${rootURL}/plugin/publish-over-ssh/js/pos.js" />
-        <j:forEach var="config" items="${descriptor.hostConfigurations}">
+        <j:forEach var="config" items="${descriptor.getPublisherDescriptor().getHostConfigurationsForJob(it)}">
             <span class="pos-host-configs-data-holder"
                   data-config-name="${config.name}"
                   data-effective-disable-exec="${config.effectiveDisableExec}"/>

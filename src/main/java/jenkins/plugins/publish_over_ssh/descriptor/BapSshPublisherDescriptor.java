@@ -26,11 +26,20 @@ package jenkins.plugins.publish_over_ssh.descriptor;
 
 import hudson.Extension;
 import hudson.model.Descriptor;
+import hudson.model.ItemGroup;
+import hudson.model.Job;
 import jenkins.model.Jenkins;
+import jenkins.plugins.publish_over_ssh.BapSshHostConfiguration;
 import jenkins.plugins.publish_over_ssh.BapSshPublisher;
 import jenkins.plugins.publish_over_ssh.BapSshPublisherPlugin;
+import jenkins.plugins.publish_over_ssh.BapSshSiteJobProperty;
 import jenkins.plugins.publish_over_ssh.Messages;
 import org.jenkinsci.Symbol;
+
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 
 @Extension @Symbol("sshPublisherDesc")
 public class BapSshPublisherDescriptor extends Descriptor<BapSshPublisher> {
@@ -50,6 +59,70 @@ public class BapSshPublisherDescriptor extends Descriptor<BapSshPublisher> {
 
     public BapSshTransferDescriptor getTransferDescriptor() {
         return Jenkins.getActiveInstance().getDescriptorByType(BapSshTransferDescriptor.class);
+    }
+
+    /**
+     * Returns a merged list of SSH host configurations visible to the given job, combining
+     * project-level, folder-ancestor-level, and global configurations.
+     *
+     * <p>Names are deduplicated: project-level entries take priority over folder-level, which
+     * take priority over global entries. The resulting list preserves insertion order so that
+     * more-specific configurations appear first in the UI dropdown.</p>
+     *
+     * @param item the job (or any object — non-Job values are ignored gracefully)
+     * @return combined, deduplicated list of host configurations
+     */
+    public List<BapSshHostConfiguration> getHostConfigurationsForJob(final Object item) {
+        Job<?, ?> job = (item instanceof Job) ? (Job<?, ?>) item : null;
+        List<BapSshHostConfiguration> result = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+
+        if (job != null) {
+            // Project-level
+            BapSshSiteJobProperty jobProp = job.getProperty(BapSshSiteJobProperty.class);
+            if (jobProp != null) {
+                addUnique(result, seen, jobProp.getHostConfigurations());
+            }
+            // Folder ancestors
+            addFolderConfigs(result, seen, job.getParent());
+        }
+
+        // Global fallback
+        addUnique(result, seen, getPublisherPluginDescriptor().getHostConfigurations());
+        return result;
+    }
+
+    private void addUnique(final List<BapSshHostConfiguration> target,
+                           final Set<String> seen,
+                           final List<BapSshHostConfiguration> source) {
+        for (BapSshHostConfiguration hc : source) {
+            if (seen.add(hc.getName())) {
+                target.add(hc);
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void addFolderConfigs(final List<BapSshHostConfiguration> target,
+                                  final Set<String> seen,
+                                  final ItemGroup<?> parent) {
+        if (parent == null || parent instanceof Jenkins) {
+            return;
+        }
+        try {
+            if (parent instanceof com.cloudbees.hudson.plugins.folder.AbstractFolder) {
+                com.cloudbees.hudson.plugins.folder.AbstractFolder<?> folder =
+                        (com.cloudbees.hudson.plugins.folder.AbstractFolder<?>) parent;
+                jenkins.plugins.publish_over_ssh.BapSshSiteFolderProperty prop =
+                        folder.getProperties().get(jenkins.plugins.publish_over_ssh.BapSshSiteFolderProperty.class);
+                if (prop != null) {
+                    addUnique(target, seen, prop.getHostConfigurations());
+                }
+                addFolderConfigs(target, seen, folder.getParent());
+            }
+        } catch (NoClassDefFoundError ignored) {
+            // cloudbees-folder plugin not installed
+        }
     }
 
     public jenkins.plugins.publish_over.view_defaults.BapPublisher.Messages getCommonFieldNames() {

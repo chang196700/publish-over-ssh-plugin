@@ -26,9 +26,15 @@ package jenkins.plugins.publish_over_ssh;
 
 import hudson.Extension;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import hudson.Launcher;
+import hudson.model.AbstractBuild;
+import hudson.model.BuildListener;
+import hudson.model.ItemGroup;
+import hudson.model.Job;
 import jenkins.model.Jenkins;
 import jenkins.plugins.publish_over.BPPlugin;
 import jenkins.plugins.publish_over.BPPluginDescriptor;
@@ -46,6 +52,9 @@ import org.kohsuke.stapler.DataBoundSetter;
 public class BapSshPublisherPlugin extends BPPlugin<BapSshPublisher, BapSshClient, BapSshCommonConfiguration> {
 
     private static final long serialVersionUID = 1L;
+
+    /** Holds the current build during {@link #perform} to allow context-aware config lookup. */
+    static final ThreadLocal<AbstractBuild<?, ?>> CURRENT_BUILD = new ThreadLocal<>();
 
     public BapSshPublisherPlugin(final ArrayList<BapSshPublisher> publishers, final boolean continueOnError, final boolean failOnError,
                                  final boolean alwaysPublishFromMaster, final String masterNodeName,
@@ -136,8 +145,73 @@ public class BapSshPublisherPlugin extends BPPlugin<BapSshPublisher, BapSshClien
         return Jenkins.getInstance().getDescriptorByType(Descriptor.class);
     }
 
+    /**
+     * Overrides {@code perform} to capture the current build in a thread-local so that
+     * {@link #getConfiguration(String)} can resolve servers from project/folder properties.
+     */
+    @Override
+    public boolean perform(final AbstractBuild<?, ?> build, final Launcher launcher, final BuildListener listener)
+            throws InterruptedException, IOException {
+        CURRENT_BUILD.set(build);
+        try {
+            return super.perform(build, launcher, listener);
+        } finally {
+            CURRENT_BUILD.remove();
+        }
+    }
+
+    /**
+     * Resolves the named SSH server configuration by searching the project and its ancestor
+     * folders before falling back to the global system configuration.
+     *
+     * <p>Priority: project-level &gt; folder ancestors (nearest first) &gt; global.</p>
+     */
+    @Override
     public BapSshHostConfiguration getConfiguration(final String name) {
+        AbstractBuild<?, ?> build = CURRENT_BUILD.get();
+        if (build != null) {
+            Job<?, ?> job = build.getProject();
+            // Check job-level property first
+            BapSshSiteJobProperty jobProp = job.getProperty(BapSshSiteJobProperty.class);
+            if (jobProp != null) {
+                jobProp.resolveCommonConfig(getDescriptor().getCommonConfig());
+                BapSshHostConfiguration config = jobProp.getConfiguration(name);
+                if (config != null) {
+                    return config;
+                }
+            }
+            // Walk up the folder hierarchy
+            BapSshHostConfiguration config = resolveFromFolderHierarchy(job.getParent(), name);
+            if (config != null) {
+                return config;
+            }
+        }
         return getDescriptor().getConfiguration(name);
+    }
+
+    private BapSshHostConfiguration resolveFromFolderHierarchy(final ItemGroup<?> parent, final String name) {
+        if (parent == null) {
+            return null;
+        }
+        // Guarded so the plugin works without the cloudbees-folder plugin installed.
+        try {
+            if (parent instanceof com.cloudbees.hudson.plugins.folder.AbstractFolder) {
+                com.cloudbees.hudson.plugins.folder.AbstractFolder<?> folder =
+                        (com.cloudbees.hudson.plugins.folder.AbstractFolder<?>) parent;
+                BapSshSiteFolderProperty prop = folder.getProperties().get(BapSshSiteFolderProperty.class);
+                if (prop != null) {
+                    prop.resolveCommonConfig(getDescriptor().getCommonConfig());
+                    BapSshHostConfiguration config = prop.getConfiguration(name);
+                    if (config != null) {
+                        return config;
+                    }
+                }
+                return resolveFromFolderHierarchy(folder.getParent(), name);
+            }
+        } catch (NoClassDefFoundError ignored) {
+            // cloudbees-folder plugin not installed — skip folder-level lookup
+        }
+        return null;
     }
 
     @Extension @Symbol("sshPublisher")
