@@ -24,18 +24,21 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Build with Maven
-        run: mvn --batch-mode package -DskipTests
+      - name: Compute JEP-229 version
+        id: ver
+        run: |
+          COUNT=$(git rev-list --count HEAD)
+          HASH=$(git rev-parse --short HEAD)
+          echo "version=${COUNT}.v${HASH}_" >> $GITHUB_OUTPUT
 
-      - name: Get short SHA
-        id: sha
-        run: echo "short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+      - name: Build with Maven
+        run: mvn --batch-mode package -DskipTests -Dchangelist=${{ steps.ver.outputs.version }}
 
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
-          tag: build-${{ steps.sha.outputs.short }}
-          name: "Build ${{ steps.sha.outputs.short }}"
+          tag: ${{ steps.ver.outputs.version }}
+          name: "${{ steps.ver.outputs.version }}"
           body: |
             Automated build from branch `jcasc-main`.
 
