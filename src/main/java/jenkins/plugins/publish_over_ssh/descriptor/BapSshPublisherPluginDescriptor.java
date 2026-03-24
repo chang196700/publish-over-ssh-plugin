@@ -113,6 +113,13 @@ public class BapSshPublisherPluginDescriptor extends BuildStepDescriptor<Publish
         return retVal;
     }
 
+    public void setHostConfigurations(final List<BapSshHostConfiguration> hostConfigurations) {
+        for (BapSshHostConfiguration hostConfig : hostConfigurations) {
+            hostConfig.setCommonConfig(commonConfig);
+        }
+        this.hostConfigurations.replaceBy(hostConfigurations);
+    }
+
     public BapSshHostConfiguration getConfiguration(final String name) {
         for (BapSshHostConfiguration configuration : hostConfigurations) {
             if (configuration.getName().equals(name)) {

@@ -1,0 +1,39 @@
+unclassified:
+  sshPublisher:
+    commonConfig:
+      disableAllExec: false
+    hostConfigurations:
+    - name: "my-server"
+      hostname: "192.168.1.10"
+      username: "deploy"
+      encryptedPassword: ""
+      remoteRootDir: "/var/www"
+      port: 22
+      timeout: 300000
+      overrideKey: false
+      keyPath: ""
+      key: ""
+      disableExec: false
+      avoidSameFileUploads: false
+      proxyHost: ""
+      proxyPort: 0
+      proxyUser: ""
+      secretProxyPassword: ""
+      proxyType: ""
+    - name: "backup-server"
+      hostname: "10.0.0.5"
+      username: "admin"
+      encryptedPassword: ""
+      remoteRootDir: "/backup"
+      port: 2222
+      timeout: 60000
+      overrideKey: true
+      keyPath: "/home/jenkins/.ssh/id_rsa"
+      key: ""
+      disableExec: true
+      avoidSameFileUploads: true
+      proxyHost: ""
+      proxyPort: 0
+      proxyUser: ""
+      secretProxyPassword: ""
+      proxyType: ""
