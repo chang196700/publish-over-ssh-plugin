@@ -28,6 +28,7 @@ import com.cloudbees.hudson.plugins.folder.AbstractFolder;
 import com.cloudbees.hudson.plugins.folder.AbstractFolderProperty;
 import com.cloudbees.hudson.plugins.folder.AbstractFolderPropertyDescriptor;
 import hudson.Extension;
+import hudson.model.Item;
 import hudson.model.Job;
 import hudson.util.CopyOnWriteList;
 import hudson.util.FormValidation;
@@ -165,7 +166,12 @@ public class BapSshSiteFolderProperty extends AbstractFolderProperty<AbstractFol
 
         @RequirePOST
         public FormValidation doTestConnection(final StaplerRequest2 request, final StaplerResponse2 response) {
-            Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+            AbstractFolder<?> folder = request.findAncestorObject(AbstractFolder.class);
+            if (folder != null) {
+                folder.checkPermission(Item.CONFIGURE);
+            } else {
+                Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+            }
             final BapSshHostConfiguration hostConfig = request.bindParameters(BapSshHostConfiguration.class, "");
             hostConfig.setCommonConfig(request.bindParameters(BapSshCommonConfiguration.class, "common."));
             return BapSshPublisherPluginDescriptor.validateConnection(

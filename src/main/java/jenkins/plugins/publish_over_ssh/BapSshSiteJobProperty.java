@@ -25,6 +25,7 @@
 package jenkins.plugins.publish_over_ssh;
 
 import hudson.Extension;
+import hudson.model.Item;
 import hudson.model.Job;
 import hudson.model.JobProperty;
 import hudson.model.JobPropertyDescriptor;
@@ -166,7 +167,12 @@ public class BapSshSiteJobProperty extends JobProperty<Job<?, ?>> {
 
         @RequirePOST
         public FormValidation doTestConnection(final StaplerRequest2 request, final StaplerResponse2 response) {
-            Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+            Job<?, ?> job = request.findAncestorObject(Job.class);
+            if (job != null) {
+                job.checkPermission(Item.CONFIGURE);
+            } else {
+                Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+            }
             final BapSshHostConfiguration hostConfig = request.bindParameters(BapSshHostConfiguration.class, "");
             hostConfig.setCommonConfig(request.bindParameters(BapSshCommonConfiguration.class, "common."));
             return BapSshPublisherPluginDescriptor.validateConnection(
