@@ -41,6 +41,7 @@ jobs:
         with:
           tag: ${{ steps.ver.outputs.version }}
           name: "${{ steps.ver.outputs.version }}"
+          commit: ${{ github.sha }}
           body: |
             Automated build from branch `jcasc-main`.
 
