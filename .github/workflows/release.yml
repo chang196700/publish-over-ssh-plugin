@@ -33,6 +33,19 @@ jobs:
           HASH=$(git rev-parse --short HEAD)
           echo "version=${COUNT}.v${HASH}_" >> $GITHUB_OUTPUT
 
+          # Generate changelog from commits since last tag, or last 20 commits if no tag exists
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -n "$LAST_TAG" ]; then
+            CHANGELOG=$(git log "${LAST_TAG}..HEAD" --pretty=format:"- %s" --no-merges)
+          else
+            CHANGELOG=$(git log -20 --pretty=format:"- %s" --no-merges)
+          fi
+          # Write multiline output safely
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "changelog<<${EOF}" >> $GITHUB_OUTPUT
+          echo "${CHANGELOG}" >> $GITHUB_OUTPUT
+          echo "${EOF}" >> $GITHUB_OUTPUT
+
       - name: Build with Maven
         run: mvn --batch-mode package -DskipTests -Dchangelist=${{ steps.ver.outputs.version }}
 
@@ -48,8 +61,10 @@ jobs:
             **Commit:** ${{ github.sha }}
 
             ### Changes
-            - JCasC support for `hostConfigurations`
-            - Install the `.hpi` file via **Manage Jenkins → Plugins → Advanced → Deploy Plugin**
+            ${{ steps.ver.outputs.changelog }}
+
+            ---
+            Install the `.hpi` file via **Manage Jenkins → Plugins → Advanced → Deploy Plugin**
           artifacts: target/publish-over-ssh.hpi
           artifactContentType: application/octet-stream
           allowUpdates: true
