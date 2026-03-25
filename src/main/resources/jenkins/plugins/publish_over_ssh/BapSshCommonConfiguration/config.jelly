@@ -30,9 +30,11 @@
     <f:entry title="${%passphrase}" field="encryptedPassphrase">
         <f:password name="common.encryptedPassphrase"/>
     </f:entry>
+    <j:if test="${app.hasPermission(app.ADMINISTER)}">
     <f:entry title="${%keyPath}" field="keyPath">
         <f:textbox name="common.keyPath"/>
     </f:entry>
+    </j:if>
     <f:entry title="${%key}" field="key">
         <f:textarea name="common.key"/>
     </f:entry>

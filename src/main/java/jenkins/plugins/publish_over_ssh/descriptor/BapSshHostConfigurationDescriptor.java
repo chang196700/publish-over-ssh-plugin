@@ -26,6 +26,7 @@ package jenkins.plugins.publish_over_ssh.descriptor;
 
 import hudson.Extension;
 import hudson.model.Descriptor;
+import hudson.model.Item;
 import hudson.util.FormValidation;
 import jenkins.model.Jenkins;
 import jenkins.plugins.publish_over.BPValidators;
@@ -36,6 +37,8 @@ import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest2;
 import org.kohsuke.stapler.StaplerResponse2;
 import org.kohsuke.stapler.interceptor.RequirePOST;
+
+import com.cloudbees.hudson.plugins.folder.AbstractFolder;
 
 @Extension
 public class BapSshHostConfigurationDescriptor extends Descriptor<BapSshHostConfiguration> {
@@ -87,13 +90,29 @@ public class BapSshHostConfigurationDescriptor extends Descriptor<BapSshHostConf
 
     @RequirePOST
     public FormValidation doCheckKeyPath(@QueryParameter final String value) {
-        Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+        if (!Jenkins.get().hasPermission(Jenkins.ADMINISTER)) {
+            return FormValidation.ok();
+        }
         return BPValidators.validateFileOnMaster(value);
     }
 
     @RequirePOST
     public FormValidation doTestConnection(final StaplerRequest2 request, final StaplerResponse2 response) {
-        Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+        hudson.model.Job<?, ?> job = request.findAncestorObject(hudson.model.Job.class);
+        if (job != null) {
+            job.checkPermission(Item.CONFIGURE);
+        } else {
+            try {
+                AbstractFolder<?> folder = request.findAncestorObject(AbstractFolder.class);
+                if (folder != null) {
+                    folder.checkPermission(Item.CONFIGURE);
+                } else {
+                    Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+                }
+            } catch (NoClassDefFoundError e) {
+                Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+            }
+        }
 
         final BapSshPublisherPlugin.Descriptor pluginDescriptor;
         Jenkins j = Jenkins.getInstanceOrNull();

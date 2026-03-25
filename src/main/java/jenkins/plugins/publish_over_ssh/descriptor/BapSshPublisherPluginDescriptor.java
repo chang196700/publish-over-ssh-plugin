@@ -39,9 +39,12 @@ import org.apache.commons.lang.StringUtils;
 import org.kohsuke.stapler.StaplerRequest2;
 import org.kohsuke.stapler.StaplerResponse2;
 
+import com.cloudbees.hudson.plugins.folder.AbstractFolder;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import hudson.Util;
 import hudson.model.AbstractProject;
+import hudson.model.Item;
+import hudson.model.Job;
 import hudson.model.TaskListener;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.Publisher;
@@ -200,7 +203,21 @@ public class BapSshPublisherPluginDescriptor extends BuildStepDescriptor<Publish
 
     @RequirePOST
     public FormValidation doTestConnection(final StaplerRequest2 request, final StaplerResponse2 response) {
-        Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+        Job<?, ?> job = request.findAncestorObject(Job.class);
+        if (job != null) {
+            job.checkPermission(Item.CONFIGURE);
+        } else {
+            try {
+                AbstractFolder<?> folder = request.findAncestorObject(AbstractFolder.class);
+                if (folder != null) {
+                    folder.checkPermission(Item.CONFIGURE);
+                } else {
+                    Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+                }
+            } catch (NoClassDefFoundError e) {
+                Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+            }
+        }
         final BapSshHostConfiguration hostConfig = request.bindParameters(BapSshHostConfiguration.class, "");
         hostConfig.setCommonConfig(request.bindParameters(BapSshCommonConfiguration.class, "common."));
         return validateConnection(hostConfig, createDummyBuildInfo());

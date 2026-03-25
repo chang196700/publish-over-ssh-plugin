@@ -50,9 +50,11 @@
             <f:entry title="${%password}" field="encryptedPassword">
                 <f:password/>
             </f:entry>
+            <j:if test="${app.hasPermission(app.ADMINISTER)}">
             <f:entry title="${%keyPath}" field="keyPath">
                 <f:textbox/>
             </f:entry>
+            </j:if>
             <f:entry title="${%key}" field="key">
                 <f:textarea/>
             </f:entry>
